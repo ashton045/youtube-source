@@ -190,7 +190,7 @@ Currently, the following clients are available for use:
 | `WEB`             | Yes          | Pot       | No                      | Yes + Livestream | Video, Search, Playlist, Mix  |                                                      |
 | `MWEB`            | Yes          | Pot       | Yes                     | Yes + Livestream | Video, Search, Playlist, Mix  |                                                      |
 | `WEBEMBEDDED`     | Yes          | Pot       | Limited                 | Yes + Livestream | Video                         |                                                      |
-| `ANDROID`         | Yes          | No        | No                      | Yes + Livestream | Video, Search, Playlist, Mix  | Heavily restricted, frequently dysfunctional         |
+| `ANDROID`         | Yes          | No        | No                      | Yes + Livestream | Video, Search, Playlist, Mix  |                                                      |
 | `ANDROID_MUSIC`   | Yes          | No        | No                      | Yes              | Video, Search, Mix            |                                                      |
 | `ANDROID_VR`      | Yes          | No        | No                      | Yes + Livestream | Video, Search, Playlist, Mix  |                                                      |
 | `IOS`             | No           | No        | No                      | Yes + Livestream | Video, Search, Playlist, Mix  |                                                      |
