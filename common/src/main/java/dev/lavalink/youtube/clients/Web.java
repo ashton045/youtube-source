@@ -19,7 +19,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import org.apache.http.client.utils.URIBuilder;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -139,6 +141,27 @@ public class Web extends StreamingNonMusicClient {
                                 @NotNull String videoId) throws IOException {
         RemotePoToken.Result result = source.generatePoToken(httpInterface, videoId);
         if (result != null) requestPoToken = result.getPoToken();
+    }
+
+    @Override
+    @NotNull
+    public URI transformPlaybackUri(@NotNull URI originalUri,
+                                    @NotNull URI resolvedPlaybackUri,
+                                    @Nullable String poToken) {
+        if (poToken == null) {
+            return resolvedPlaybackUri;
+        }
+
+        log.debug("Applying 'pot' parameter on playback URI: {}", resolvedPlaybackUri);
+        URIBuilder builder = new URIBuilder(resolvedPlaybackUri);
+        builder.addParameter("pot", poToken);
+
+        try {
+            return builder.build();
+        } catch (URISyntaxException e) {
+            log.debug("Failed to apply 'pot' parameter.", e);
+            return resolvedPlaybackUri;
+        }
     }
 
     @Override

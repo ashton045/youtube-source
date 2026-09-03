@@ -6,6 +6,7 @@ import dev.lavalink.youtube.clients.skeleton.Client;
 import dev.lavalink.youtube.track.format.StreamFormat;
 import dev.lavalink.youtube.track.format.TrackFormats;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -22,6 +23,7 @@ public class RemoteMWebPlaybackTest {
     private static final String AGENT = "cipher/1.0";
 
     @Test
+    @Disabled("Requires a running webpo-generator instance at localhost:8080")
     public void testMWebPlaybackUrl() throws Throwable {
 
         Client client = new MWeb();
