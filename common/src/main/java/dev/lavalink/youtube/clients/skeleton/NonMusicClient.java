@@ -45,6 +45,7 @@ public abstract class NonMusicClient implements Client {
 
     protected static String WEB_PLAYER_PARAMS = "2AMB";
     protected static String MOBILE_PLAYER_PARAMS = "CgIIAdgDAQ%3D%3D";
+    protected static final String DEFAULT_EMBED_URL = "https://google.com";
 
     protected int playlistPageCount = 6;
 
@@ -116,9 +117,9 @@ public abstract class NonMusicClient implements Client {
 
         // Skip embed workaround for OAuth-supporting clients to avoid EMBEDDER_IDENTITY_DENIED errors.
         // OAuth authentication should be sufficient without pretending to be an embedded player.
-        if (!supportsOAuth() && (status == null || status != PlayabilityStatus.NON_EMBEDDABLE)) {
+        if (isEmbedded() || (!supportsOAuth() && (status == null || status != PlayabilityStatus.NON_EMBEDDABLE))) {
             config.withClientField("clientScreen", "EMBED")
-                .withThirdPartyEmbedUrl("https://google.com");
+                .withThirdPartyEmbedUrl(DEFAULT_EMBED_URL);
         }
 
         config.withRootField("videoId", videoId)
@@ -132,7 +133,7 @@ public abstract class NonMusicClient implements Client {
         }
 
         // For embedded clients, fetch and include encryptedHostFlags to avoid playback restrictions.
-        if (isEmbedded()) {
+        if (isEmbedded() || (!supportsOAuth() && (status == null || status != PlayabilityStatus.NON_EMBEDDABLE))) {
             String encryptedHostFlags = fetchEncryptedHostFlags(videoId);
             if (encryptedHostFlags != null) {
                 config.withEncryptedHostFlags(encryptedHostFlags);
@@ -202,11 +203,12 @@ public abstract class NonMusicClient implements Client {
      */
     @Nullable
     protected String fetchEncryptedHostFlags(@NotNull String videoId) {
-        String embedUrl = "https://www.youtube.com/embed/" + videoId;
+        String embedUrl = "https://www.youtube.com/embed/" + videoId + "?html5=1";
 
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             HttpGet request = new HttpGet(embedUrl);
             request.setHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            request.setHeader("Referer", DEFAULT_EMBED_URL);
 
             HttpResponse response = httpClient.execute(request);
             String html = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);

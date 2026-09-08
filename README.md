@@ -247,10 +247,6 @@ plugins:
       # setting "enabled: true" is the bare minimum to get OAuth working.
       enabled: true
 
-      # If enabled, TV tries without OAuth first and retries with OAuth when
-      # the TV with PoT fails.
-      # fallback: true
-
       # if you have a refresh token, you may set it below (make sure to uncomment the line to apply it).
       # setting a valid refresh token will skip the OAuth flow entirely. See above note on how to retrieve
       # your refreshToken.

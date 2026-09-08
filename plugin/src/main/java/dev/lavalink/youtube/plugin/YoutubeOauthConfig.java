@@ -2,7 +2,6 @@ package dev.lavalink.youtube.plugin;
 
 public class YoutubeOauthConfig {
     private boolean enabled = false;
-    private boolean fallback = false;
     private String refreshToken;
     private boolean skipInitialization = false;
 
@@ -12,10 +11,6 @@ public class YoutubeOauthConfig {
 
     public String getRefreshToken() {
         return refreshToken;
-    }
-
-    public boolean getFallback() {
-        return fallback;
     }
 
     public boolean getSkipInitialization() {
@@ -28,10 +23,6 @@ public class YoutubeOauthConfig {
 
     public void setRefreshToken(String refreshToken) {
         this.refreshToken = refreshToken;
-    }
-
-    public void setFallback(boolean fallback) {
-        this.fallback = fallback;
     }
 
     public void setSkipInitialization(boolean skipInitialization) {
