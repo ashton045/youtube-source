@@ -1,5 +1,6 @@
 package dev.lavalink.youtube.clients;
 
+import com.sedmelluq.discord.lavaplayer.tools.DataFormatTools;
 import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
 import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
@@ -126,16 +127,27 @@ public class MWeb extends StreamingNonMusicClient {
 
     @Override
     protected String extractPlaylistName(@NotNull JsonBrowser json) {
-        return json.get("header")
-            .get("pageHeaderRenderer")
-            .get("pageTitle")
-            .text();
+        JsonBrowser pageHeader = json.get("header").get("pageHeaderRenderer");
+        String title = pageHeader.get("pageTitle").text();
+
+        if (!DataFormatTools.isNullOrEmpty(title)) {
+            return title;
+        }
+
+        title = pageHeader.get("content").get("pageHeaderViewModel").get("title")
+            .get("dynamicTextViewModel").get("text").get("content").text();
+
+        if (!DataFormatTools.isNullOrEmpty(title)) {
+            return title;
+        }
+
+        return super.extractPlaylistName(json);
     }
 
     @Override
     @NotNull
     protected JsonBrowser extractPlaylistVideoList(@NotNull JsonBrowser json) {
-        return json.get("contents")
+        JsonBrowser itemSectionContents = json.get("contents")
             .get("singleColumnBrowseResultsRenderer")
             .get("tabs")
             .index(0)
@@ -145,9 +157,96 @@ public class MWeb extends StreamingNonMusicClient {
             .get("contents")
             .index(0)
             .get("itemSectionRenderer")
-            .get("contents")
+            .get("contents");
+
+        JsonBrowser playlistVideoList = itemSectionContents
             .index(0)
             .get("playlistVideoListRenderer");
+
+        if (!playlistVideoList.isNull()) {
+            return playlistVideoList;
+        }
+
+        return itemSectionContents;
+    }
+
+    @Override
+    @Nullable
+    protected String extractPlaylistContinuationToken(@NotNull JsonBrowser videoList) {
+        JsonBrowser contents = videoList.get("contents");
+
+        if (!contents.isNull()) {
+            videoList = contents;
+        }
+
+        return videoList.values()
+            .stream()
+            .filter(item -> !item.get("continuationItemRenderer").isNull() || !item.get("continuationItemViewModel").isNull())
+            .findFirst()
+            .map(item -> {
+                JsonBrowser continuationItem = item.get("continuationItemRenderer");
+
+                if (!continuationItem.isNull()) {
+                    JsonBrowser continuationEndpoint = continuationItem.get("continuationEndpoint");
+                    String token = continuationEndpoint.get("continuationCommand").get("token").text();
+
+                    if (!DataFormatTools.isNullOrEmpty(token)) {
+                        return token;
+                    }
+
+                    return continuationEndpoint.get("commandExecutorCommand").get("commands").index(1)
+                        .get("continuationCommand").get("token").text();
+                }
+
+                return item.get("continuationItemViewModel")
+                    .get("continuationCommand")
+                    .get("innertubeCommand")
+                    .get("continuationCommand")
+                    .get("token")
+                    .text();
+            })
+            .orElse(null);
+    }
+
+    @Override
+    @NotNull
+    protected JsonBrowser extractPlaylistContinuationVideos(@NotNull JsonBrowser continuationJson) {
+        return continuationJson.get("onResponseReceivedActions")
+            .index(0)
+            .get("appendContinuationItemsAction")
+            .get("continuationItems");
+    }
+
+    @Override
+    protected void extractPlaylistTracks(@NotNull JsonBrowser json,
+                                         @NotNull List<AudioTrack> tracks,
+                                         @NotNull YoutubeAudioSourceManager source) {
+        if (!json.get("contents").isNull()) {
+            json = json.get("contents");
+        }
+
+        if (json.isNull()) {
+            return;
+        }
+
+        for (JsonBrowser track : json.values()) {
+            JsonBrowser item = track.get("playlistVideoRenderer");
+
+            if (!item.isNull()) {
+                super.extractPlaylistTracks(track, tracks, source);
+                continue;
+            }
+
+            JsonBrowser lockup = track.get("lockupViewModel");
+
+            if (!lockup.isNull()) {
+                AudioTrack audioTrack = extractLockupTrack(lockup, source);
+
+                if (audioTrack != null) {
+                    tracks.add(audioTrack);
+                }
+            }
+        }
     }
 
     @Override

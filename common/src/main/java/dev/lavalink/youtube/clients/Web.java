@@ -192,24 +192,49 @@ public class Web extends StreamingNonMusicClient {
 
     @Override
     protected String extractPlaylistName(@NotNull JsonBrowser json) {
-        return json.get("metadata").get("playlistMetadataRenderer").get("title").text();
+        String title = json.get("metadata").get("playlistMetadataRenderer").get("title").text();
+        if (!DataFormatTools.isNullOrEmpty(title)) {
+            return title;
+        }
+
+        JsonBrowser pageHeader = json.get("header").get("pageHeaderRenderer");
+        title = pageHeader.get("pageTitle").text();
+        if (!DataFormatTools.isNullOrEmpty(title)) {
+            return title;
+        }
+
+        title = pageHeader.get("content").get("pageHeaderViewModel").get("title")
+                .get("dynamicTextViewModel").get("text").get("content").text();
+        if (!DataFormatTools.isNullOrEmpty(title)) {
+            return title;
+        }
+
+        return super.extractPlaylistName(json);
     }
 
+    @Override
     @NotNull
     protected JsonBrowser extractPlaylistVideoList(@NotNull JsonBrowser json) {
-        return json.get("contents")
+        JsonBrowser sectionList = json.get("contents")
                 .get("twoColumnBrowseResultsRenderer")
                 .get("tabs")
                 .index(0)
                 .get("tabRenderer")
                 .get("content")
                 .get("sectionListRenderer")
-                .get("contents")
-                .index(0)
+                .get("contents");
+
+        JsonBrowser playlistVideoList = sectionList.index(0)
                 .get("itemSectionRenderer")
                 .get("contents")
                 .index(0)
                 .get("playlistVideoListRenderer");
+
+        if (!playlistVideoList.isNull()) {
+            return playlistVideoList;
+        }
+
+        return sectionList;
     }
 
     @Override
@@ -224,17 +249,29 @@ public class Web extends StreamingNonMusicClient {
 
         return videoList.values()
                 .stream()
-                .filter(item -> !item.get("continuationItemRenderer").isNull())
+                .filter(item -> !item.get("continuationItemRenderer").isNull() || !item.get("continuationItemViewModel").isNull())
                 .findFirst()
                 .map(item -> {
-                    JsonBrowser continuationEndpoint = item.get("continuationItemRenderer").get("continuationEndpoint");
-                    String token = continuationEndpoint.get("continuationCommand").get("token").text();
-                    if (!DataFormatTools.isNullOrEmpty(token)) {
-                        return token;
+                    JsonBrowser continuationItem = item.get("continuationItemRenderer");
+
+                    if (!continuationItem.isNull()) {
+                        JsonBrowser continuationEndpoint = continuationItem.get("continuationEndpoint");
+                        String token = continuationEndpoint.get("continuationCommand").get("token").text();
+
+                        if (!DataFormatTools.isNullOrEmpty(token)) {
+                            return token;
+                        }
+
+                        return continuationEndpoint.get("commandExecutorCommand").get("commands").index(1)
+                                .get("continuationCommand").get("token").text();
                     }
 
-                    return continuationEndpoint.get("commandExecutorCommand").get("commands").index(1)
-                            .get("continuationCommand").get("token").text();
+                    return item.get("continuationItemViewModel")
+                            .get("continuationCommand")
+                            .get("innertubeCommand")
+                            .get("continuationCommand")
+                            .get("token")
+                            .text();
                 })
                 .orElse(null);
     }
@@ -246,6 +283,46 @@ public class Web extends StreamingNonMusicClient {
                 .index(0)
                 .get("appendContinuationItemsAction")
                 .get("continuationItems");
+    }
+
+    @Override
+    protected void extractPlaylistTracks(@NotNull JsonBrowser json,
+                                         @NotNull List<AudioTrack> tracks,
+                                         @NotNull YoutubeAudioSourceManager source) {
+        if (!json.get("contents").isNull()) {
+            json = json.get("contents");
+        }
+
+        if (json.isNull()) {
+            return;
+        }
+
+        for (JsonBrowser track : json.values()) {
+            JsonBrowser item = track.get("playlistVideoRenderer");
+
+            if (!item.isNull()) {
+                super.extractPlaylistTracks(track, tracks, source);
+                continue;
+            }
+
+            JsonBrowser lockup = track.get("lockupViewModel");
+
+            if (!lockup.isNull()) {
+                AudioTrack audioTrack = extractLockupTrack(lockup, source);
+
+                if (audioTrack != null) {
+                    tracks.add(audioTrack);
+                }
+
+                continue;
+            }
+
+            JsonBrowser section = track.get("itemSectionRenderer");
+
+            if (!section.isNull()) {
+                extractPlaylistTracks(section.get("contents"), tracks, source);
+            }
+        }
     }
 
     @Override

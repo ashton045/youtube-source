@@ -411,6 +411,148 @@ public abstract class NonMusicClient implements Client {
         long duration = DataFormatTools.durationTextToMillis(durationText);
         return buildAudioTrack(source, json, title, author, duration, videoId, false);
     }
+
+    @Nullable
+    protected AudioTrack extractLockupTrack(@NotNull JsonBrowser json,
+                                            @NotNull YoutubeAudioSourceManager source) {
+        String videoId = json.get("contentId").text();
+
+        if (DataFormatTools.isNullOrEmpty(videoId)) {
+            videoId = json.get("rendererContext")
+                .get("commandContext")
+                .get("onTap")
+                .get("innertubeCommand")
+                .get("watchEndpoint")
+                .get("videoId")
+                .text();
+        }
+
+        if (DataFormatTools.isNullOrEmpty(videoId)) {
+            return null;
+        }
+
+        JsonBrowser metadata = json.get("metadata").get("lockupMetadataViewModel");
+        String title = metadata.get("title").get("content").text();
+
+        if (DataFormatTools.isNullOrEmpty(title)) {
+            return null;
+        }
+
+        String author = metadata.get("metadata")
+            .get("contentMetadataViewModel")
+            .get("metadataRows")
+            .index(0)
+            .get("metadataParts")
+            .index(0)
+            .get("text")
+            .get("content")
+            .text();
+
+        if (DataFormatTools.isNullOrEmpty(author)) {
+            author = "Unknown artist";
+        }
+
+        long duration = Units.DURATION_MS_UNKNOWN;
+        JsonBrowser overlays = json.get("contentImage").get("thumbnailViewModel").get("overlays");
+
+        if (!overlays.isNull()) {
+            for (JsonBrowser overlay : overlays.values()) {
+                JsonBrowser badges = overlay.get("thumbnailBottomOverlayViewModel").get("badges");
+
+                if (!badges.isNull()) {
+                    for (JsonBrowser badge : badges.values()) {
+                        String text = badge.get("thumbnailBadgeViewModel").get("text").text();
+
+                        if (!DataFormatTools.isNullOrEmpty(text)) {
+                            long dur = DataFormatTools.durationTextToMillis(text);
+
+                            if (dur > 0) {
+                                duration = dur;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (duration != Units.DURATION_MS_UNKNOWN) {
+                    break;
+                }
+            }
+        }
+
+        return buildAudioTrack(source, json, title, author, duration, videoId, false);
+    }
+
+    @Nullable
+    protected AudioTrack extractElementTrack(@NotNull JsonBrowser json,
+                                             @NotNull YoutubeAudioSourceManager source) {
+        JsonBrowser vwc = json.get("newElement")
+            .get("type")
+            .get("componentType")
+            .get("model")
+            .get("videoWithContextModel")
+            .get("videoWithContextData");
+
+        if (vwc.isNull()) {
+            return null;
+        }
+
+        String videoId = vwc.get("onTap")
+            .get("innertubeCommand")
+            .get("watchEndpoint")
+            .get("videoId")
+            .text();
+
+        if (DataFormatTools.isNullOrEmpty(videoId)) {
+            videoId = vwc.get("onTap")
+                .get("innertubeCommand")
+                .get("coWatchWatchEndpointWrapperCommand")
+                .get("watchEndpoint")
+                .get("watchEndpoint")
+                .get("videoId")
+                .text();
+        }
+
+        if (DataFormatTools.isNullOrEmpty(videoId)) {
+            String url = vwc.get("videoData").get("dragAndDropUrl").text();
+
+            if (!DataFormatTools.isNullOrEmpty(url) && url.contains("v=")) {
+                videoId = url.substring(url.indexOf("v=") + 2);
+                int amp = videoId.indexOf('&');
+                if (amp != -1) videoId = videoId.substring(0, amp);
+            }
+        }
+
+        if (DataFormatTools.isNullOrEmpty(videoId)) {
+            return null;
+        }
+
+        JsonBrowser metadata = vwc.get("videoData").get("lockupMetadata").get("lockupMetadataViewModel");
+        String title = metadata.get("title").get("content").text();
+
+        if (DataFormatTools.isNullOrEmpty(title)) {
+            return null;
+        }
+
+        String author = metadata.get("metadata")
+            .get("contentMetadataViewModel")
+            .get("metadataRows")
+            .index(0)
+            .get("metadataParts")
+            .index(0)
+            .get("text")
+            .get("content")
+            .text();
+
+        if (DataFormatTools.isNullOrEmpty(author)) {
+            author = "Unknown artist";
+        }
+
+        String durationText = vwc.get("videoData").get("thumbnail").get("timestampText").text();
+        long duration = DataFormatTools.durationTextToMillis(durationText);
+
+        return buildAudioTrack(source, vwc, title, author, duration, videoId, false);
+    }
     //</editor-fold>
 
     @Override
