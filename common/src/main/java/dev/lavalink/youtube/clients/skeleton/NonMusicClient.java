@@ -122,7 +122,7 @@ public abstract class NonMusicClient implements Client {
                 .withThirdPartyEmbedUrl(DEFAULT_EMBED_URL);
 
             // For embedded clients, fetch and include encryptedHostFlags to avoid playback restrictions.
-            String encryptedHostFlags = fetchEncryptedHostFlags(videoId);
+            String encryptedHostFlags = fetchEncryptedHostFlags(videoId, config.getVisitorData());
             if (encryptedHostFlags != null) {
                 config.withEncryptedHostFlags(encryptedHostFlags);
             }
@@ -193,14 +193,26 @@ public abstract class NonMusicClient implements Client {
     }
 
     /**
+     * @param videoId The video ID to fetch the embed page for.
+     * @return The encryptedHostFlags value, or null if not found.
+     * @see #fetchEncryptedHostFlags(String, String)
+     */
+    @Nullable
+    protected String fetchEncryptedHostFlags(@NotNull String videoId) {
+        return fetchEncryptedHostFlags(videoId, null);
+    }
+
+    /**
      * Fetches the encryptedHostFlags from the YouTube embed page.
      * This is required for embedded clients to avoid playback restrictions.
      *
      * @param videoId The video ID to fetch the embed page for.
+     * @param visitorData The visitor data that the player request identifies with,
+     *                    or {@code null} to load the page as an anonymous visitor.
      * @return The encryptedHostFlags value, or null if not found.
      */
     @Nullable
-    protected String fetchEncryptedHostFlags(@NotNull String videoId) {
+    protected String fetchEncryptedHostFlags(@NotNull String videoId, @Nullable String visitorData) {
         // ?html5=1 query parameter explicitly tells yt to provide the full HTML5 embedded player
         // to avoid lightweight AMP embed variants in some cases like poor connection or similar.
         String embedUrl = "https://www.youtube.com/embed/" + videoId + "?html5=1";
@@ -208,7 +220,12 @@ public abstract class NonMusicClient implements Client {
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             HttpGet request = new HttpGet(embedUrl);
             request.setHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            // The embed URL sent in the player request must have the same origin as this referer
             request.setHeader("Referer", DEFAULT_EMBED_URL);
+
+            if (visitorData != null) {
+                request.setHeader("X-Goog-Visitor-Id", visitorData);
+            }
 
             HttpResponse response = httpClient.execute(request);
             String html = EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
