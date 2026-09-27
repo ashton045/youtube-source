@@ -194,7 +194,7 @@ Currently, the following clients are available for use:
 | `ANDROID_MUSIC`   | Yes          | No        | No                      | Yes              | Video, Search, Mix            |                                                      |
 | `ANDROID_VR`      | Yes          | No        | No                      | Yes + Livestream | Video, Search, Playlist, Mix  |                                                      |
 | `IOS`             | No           | No        | No                      | Yes + Livestream | Video, Search, Playlist, Mix  |                                                      |
-| `TV`              | Yes          | Yes       | With OAuth              | Yes + Livestream | None                          | Playback requires sign-in                            |
+| `TV`              | Yes          | Yes       | With OAuth              | Yes + Livestream | Video                         | Prefers signin                                       |
 | `TVHTML5_SIMPLY`  | Yes          | Pot       | No                      | Yes + Livestream | Video, Search, Mix            |                                                      |
 
 > [!NOTE]
@@ -271,9 +271,12 @@ play a track like:
 
 ## Using a remote webpo generator
 
-This service mints content bound PoToken for `WEB`, `MWEB`, and `MUSIC`,
-and visitor bound PoToken for `TVHTML5_SIMPLY`. It generates the PoToken (Proof of Origin Token) by solving the `Botguard Attestation` challenge, in several ways.
-Use [webpo-generator](https://github.com/ashton045/webpo-generator), a nodejs REST API to mint the tokens to their respective innertube client's playback.
+This service mints a content-bound PoToken for `WEB`, `MWEB`, and `MUSIC`,
+a visitor data-bound poToken for `TVHTML5_SIMPLY` and `WEB_EMBEDDED_PLAYER`, and a `visitor data-bound`/`living-room-potoken-id` poToken for `TVHTML5`. It generates the poToken (Proof of Origin Token) by solving the `botguard attestation` challenge, in several ways.
+Use [webpo-generator](https://github.com/ashton045/webpo-generator), a Node.js REST API to mint the tokens to their respective innertube client's playback.
+Check out the repository for more information on how to set it up.
+
+If you want to implement your own, you can follow the [webpo-generator API specification](https://github.com/ashton045/webpo-generator#endpoints).
 
 ### Lavaplayer
 ```java

@@ -2,13 +2,17 @@ package dev.lavalink.youtube.clients;
 
 import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
 import com.sedmelluq.discord.lavaplayer.tools.FriendlyException.Severity;
+import com.sedmelluq.discord.lavaplayer.tools.JsonBrowser;
 import com.sedmelluq.discord.lavaplayer.tools.io.HttpClientTools;
 import com.sedmelluq.discord.lavaplayer.tools.io.HttpInterface;
 import com.sedmelluq.discord.lavaplayer.track.AudioItem;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
 import dev.lavalink.youtube.CannotBeLoaded;
+import dev.lavalink.youtube.OptionDisabledException;
 import dev.lavalink.youtube.RemotePoToken;
 import dev.lavalink.youtube.YoutubeAudioSourceManager;
 import dev.lavalink.youtube.clients.skeleton.StreamingNonMusicClient;
+import dev.lavalink.youtube.track.YoutubeAudioTrack;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.util.EntityUtils;
@@ -41,34 +45,17 @@ public class Tv extends StreamingNonMusicClient {
         .withClientField("clientVersion", "7.20260707.07.00");
 
     protected ClientOptions options;
-    protected volatile String requestPoToken;
-    protected volatile String requestVisitorData;
+    protected volatile String poToken;
+    protected volatile String visitorData;
     protected volatile String requestLivingRoomPoTokenId;
     protected volatile boolean oauthPlayback;
-    protected final Boolean oauthPlaybackMode;
-    protected final boolean legacyPlayback;
+
+    public Tv() {
+        this(ClientOptions.DEFAULT);
+    }
 
     public Tv(@NotNull ClientOptions options) {
-        this(options, null);
-    }
-
-    public Tv(@NotNull ClientOptions options, Boolean oauthPlaybackMode) {
-        this(options, oauthPlaybackMode, false);
-    }
-
-    private Tv(@NotNull ClientOptions options, Boolean oauthPlaybackMode, boolean legacyPlayback) {
         this.options = options;
-        this.oauthPlaybackMode = oauthPlaybackMode;
-        this.legacyPlayback = legacyPlayback;
-    }
-
-    @NotNull
-    public Tv createLegacyPlaybackClient(boolean useOAuth) {
-        return new Tv(options, useOAuth, true);
-    }
-
-    public boolean isLegacyPlayback() {
-        return legacyPlayback;
     }
 
     @Override
@@ -79,31 +66,27 @@ public class Tv extends StreamingNonMusicClient {
     @Override
     @NotNull
     protected ClientConfig getBaseClientConfig(@NotNull HttpInterface httpInterface) {
-        ClientConfig config = BASE_CONFIG.copy();
-        config.withUserAgent(USER_AGENT);
-        if (requestVisitorData != null) {
-            config.withVisitorData(requestVisitorData);
+        ClientConfig config = BASE_CONFIG.copy().withUserAgent(USER_AGENT);
+        if (visitorData != null) {
+            config.withVisitorData(visitorData);
         }
         if (requestLivingRoomPoTokenId != null) {
             Map<String, Object> context = config.putOnceAndJoin(config.getRoot(), "context");
             Map<String, Object> client = config.putOnceAndJoin(context, "client");
             client.put("tvAppInfo", Collections.singletonMap("livingRoomPoTokenId", requestLivingRoomPoTokenId));
         }
-        if (requestPoToken != null) {
-            config.putOnceAndJoin(config.getRoot(), "serviceIntegrityDimensions").put("poToken", requestPoToken);
+        if (poToken != null) {
+            config.putOnceAndJoin(config.getRoot(), "serviceIntegrityDimensions").put("poToken", poToken);
         }
         return config;
     }
 
     @Override
     protected boolean preferSabrPlayback() {
-        if (legacyPlayback) {
-            return false;
-        }
         if (oauthPlayback && requestLivingRoomPoTokenId == null) {
             return false;
         }
-        return true;
+        return poToken != null;
     }
 
     private static void fetchLivingRoomPoTokenId(@NotNull HttpInterface httpInterface) {
@@ -127,6 +110,7 @@ public class Tv extends StreamingNonMusicClient {
                     log.debug("Found living room potoken ID: {}", livingRoomPoTokenId);
                 } else {
                     log.warn("Unable to find living room potoken ID in TV page");
+                    log.debug("HTML response for LR pot ID: {}", html);
                 }
             } catch (IOException e) {
                 log.error("Failed to fetch living room session", e);
@@ -139,43 +123,34 @@ public class Tv extends StreamingNonMusicClient {
                                 @NotNull HttpInterface httpInterface,
                                 @NotNull String videoId) throws IOException {
 
-        oauthPlayback = oauthPlaybackMode != null ? oauthPlaybackMode : source.getOauth2Handler().isEnabled();
+        oauthPlayback = source.getOauth2Handler().isEnabled();
 
-        log.debug("Preparing TVHTML5{} playback with {}", legacyPlayback ? " legacy" : "", oauthPlayback ? "OAuth" : "visitor data and PoToken");
+        log.debug("Preparing TVHTML5 playback with {}", oauthPlayback ? "OAuth" : "visitor data and PoToken");
 
-        if (legacyPlayback) {
-            requestPoToken = null;
-            requestVisitorData = null;
-            requestLivingRoomPoTokenId = null;
-            return;
-        }
-
-        requestVisitorData = source.getVisitorData();
+        visitorData = source.getVisitorData();
 
         if (oauthPlayback) {
             fetchLivingRoomPoTokenId(httpInterface);
             RemotePoToken.Result result = source.generatePoToken(httpInterface, livingRoomPoTokenId);
 
             if (result != null) {
-                requestPoToken = result.getPoToken();
+                poToken = result.getPoToken();
                 requestLivingRoomPoTokenId = livingRoomPoTokenId;
                 log.debug("TVHTML5 Living Room PoToken generated for playback with binding: {}", livingRoomPoTokenId);
             } else {
-                requestPoToken = null;
+                poToken = null;
                 requestLivingRoomPoTokenId = null;
-                log.debug("TVHTML5 PoToken unavailable continuing without PoToken");
             }
         } else {
             requestLivingRoomPoTokenId = null;
-            RemotePoToken.Result result = source.generatePoToken(httpInterface, requestVisitorData);
+            RemotePoToken.Result result = source.generatePoToken(httpInterface, visitorData);
 
             if (result != null) {
-                requestPoToken = result.getPoToken();
-                requestVisitorData = result.getContentBinding();
+                poToken = result.getPoToken();
+                visitorData = result.getContentBinding();
                 log.debug("TVHTML5 visitor bound PoToken generated for playback");
             } else {
-                requestPoToken = null;
-                log.debug("TVHTML5 visitor bound PoToken unavailable continuing without PoToken");
+                poToken = null;
             }
         }
     }
@@ -194,18 +169,21 @@ public class Tv extends StreamingNonMusicClient {
 
     @Override
     public boolean canHandleRequest(@NotNull String identifier) {
-        return false;
+        return getOptions().getVideoLoading()
+            && !identifier.startsWith(YoutubeAudioSourceManager.SEARCH_PREFIX)
+            && !identifier.contains("list=")
+            && super.canHandleRequest(identifier);
     }
 
     @Override
     public boolean supportsOAuth() {
-        return oauthPlaybackMode == null || oauthPlaybackMode;
+        return true;
     }
 
     @Override
     @Nullable
     public String getPoToken() {
-        return requestPoToken;
+        return poToken;
     }
 
     @Override
@@ -225,8 +203,39 @@ public class Tv extends StreamingNonMusicClient {
 
     @Override
     public AudioItem loadVideo(@NotNull YoutubeAudioSourceManager source, @NotNull HttpInterface httpInterface, @NotNull String videoId) throws CannotBeLoaded, IOException {
-        throw new FriendlyException("This client cannot load videos", Severity.COMMON,
-            new RuntimeException("TVHTML5 cannot be used to load videos"));
+        if (!getOptions().getVideoLoading()) {
+            throw new OptionDisabledException("Video loading is disabled for this client");
+        }
+
+        AudioItem item = super.loadVideo(source, httpInterface, videoId);
+        if (item instanceof YoutubeAudioTrack) {
+            YoutubeAudioTrack track = (YoutubeAudioTrack) item;
+            //uses https://www.youtube.com/oembed endpoint to load the video title and author explicitly as TVHTML5 does not return them, proposed by https://github.com/szymonwilczek
+            if (track.getInfo().title == null || "Unknown artist".equals(track.getInfo().author)) {
+                try (CloseableHttpResponse response = httpInterface.execute(new HttpGet("https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=" + videoId + "&format=json"))) {
+                    if (HttpClientTools.isSuccessWithContent(response.getStatusLine().getStatusCode())) {
+                        JsonBrowser oembed = JsonBrowser.parse(response.getEntity().getContent());
+                        String oembedTitle = oembed.get("title").text();
+                        String oembedAuthor = oembed.get("author_name").text();
+                        if (oembedTitle != null && !oembedTitle.isEmpty()) {
+                            AudioTrackInfo old = track.getInfo();
+                            AudioTrackInfo updated = new AudioTrackInfo(
+                                oembedTitle,
+                                oembedAuthor != null ? oembedAuthor : old.author,
+                                old.length,
+                                old.identifier,
+                                old.isStream,
+                                old.uri
+                            );
+                            return source.buildAudioTrack(updated);
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("Failed to fetch oEmbed metadata for {}: {}", videoId, e.getMessage());
+                }
+            }
+        }
+        return item;
     }
 
     @Override

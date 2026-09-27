@@ -120,6 +120,12 @@ public abstract class NonMusicClient implements Client {
         if (isEmbedded() || (!supportsOAuth() && (status == null || status != PlayabilityStatus.NON_EMBEDDABLE))) {
             config.withClientField("clientScreen", "EMBED")
                 .withThirdPartyEmbedUrl(DEFAULT_EMBED_URL);
+
+            // For embedded clients, fetch and include encryptedHostFlags to avoid playback restrictions.
+            String encryptedHostFlags = fetchEncryptedHostFlags(videoId);
+            if (encryptedHostFlags != null) {
+                config.withEncryptedHostFlags(encryptedHostFlags);
+            }
         }
 
         config.withRootField("videoId", videoId)
@@ -130,14 +136,6 @@ public abstract class NonMusicClient implements Client {
 
         if (params != null) {
             config.withRootField("params", params);
-        }
-
-        // For embedded clients, fetch and include encryptedHostFlags to avoid playback restrictions.
-        if (isEmbedded() || (!supportsOAuth() && (status == null || status != PlayabilityStatus.NON_EMBEDDABLE))) {
-            String encryptedHostFlags = fetchEncryptedHostFlags(videoId);
-            if (encryptedHostFlags != null) {
-                config.withEncryptedHostFlags(encryptedHostFlags);
-            }
         }
 
         String payload = config.setAttributes(httpInterface).toJsonString();
@@ -203,6 +201,8 @@ public abstract class NonMusicClient implements Client {
      */
     @Nullable
     protected String fetchEncryptedHostFlags(@NotNull String videoId) {
+        // ?html5=1 query parameter explicitly tells yt to provide the full HTML5 embedded player
+        // to avoid lightweight AMP embed variants in some cases like poor connection or similar.
         String embedUrl = "https://www.youtube.com/embed/" + videoId + "?html5=1";
 
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
@@ -573,6 +573,7 @@ public abstract class NonMusicClient implements Client {
             throw new OptionDisabledException("Video loading is disabled for this client");
         }
 
+        preparePlayback(source, httpInterface, videoId);
         JsonBrowser json = loadTrackInfoFromInnertube(source, httpInterface, videoId, null, false);
         JsonBrowser playabilityStatus = json.get("playabilityStatus");
         JsonBrowser videoDetails = json.get("videoDetails");
