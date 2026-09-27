@@ -12,11 +12,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import org.apache.http.client.utils.URIBuilder;
 
 public class MWeb extends StreamingNonMusicClient {
     public static ClientConfig BASE_CONFIG = new ClientConfig()
@@ -46,11 +44,6 @@ public class MWeb extends StreamingNonMusicClient {
     }
 
     @Override
-    public boolean canHandleRequest(@NotNull String identifier) {
-        return !identifier.startsWith(YoutubeAudioSourceManager.MUSIC_SEARCH_PREFIX);
-    }
-
-    @Override
     @NotNull
     public ClientConfig getBaseClientConfig(@NotNull HttpInterface httpInterface) {
         ClientConfig config = BASE_CONFIG.copy();
@@ -65,9 +58,7 @@ public class MWeb extends StreamingNonMusicClient {
                                 @NotNull HttpInterface httpInterface,
                                 @NotNull String videoId) throws IOException {
         RemotePoToken.Result result = source.generatePoToken(httpInterface, videoId);
-        if (result != null) {
-            poToken = result.getPoToken();
-        }
+        poToken = result == null ? null : result.getPoToken();
     }
 
     @Override
@@ -76,23 +67,7 @@ public class MWeb extends StreamingNonMusicClient {
         return poToken;
     }
 
-    @Override
-    @NotNull
-    public URI transformPlaybackUri(@NotNull URI originalUri,
-                                    @NotNull URI resolvedPlaybackUri,
-                                    @Nullable String token) {
-        if (token == null) {
-            return resolvedPlaybackUri;
-        }
 
-        try {
-            return new URIBuilder(resolvedPlaybackUri)
-                .addParameter("pot", token)
-                .build();
-        } catch (URISyntaxException e) {
-            return resolvedPlaybackUri;
-        }
-    }
 
     @Override
     @NotNull

@@ -8,11 +8,8 @@ import dev.lavalink.youtube.YoutubeAudioSourceManager;
 import dev.lavalink.youtube.RemotePoToken;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import java.net.URISyntaxException;
-import org.apache.http.client.utils.URIBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.net.URI;
 
 public class WebEmbedded extends Web {
     private static final Logger log = LoggerFactory.getLogger(WebEmbedded.class);
@@ -22,6 +19,8 @@ public class WebEmbedded extends Web {
         .withClientField("clientVersion", "2.20260908.01.00")
         .withUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         .withUserField("lockedSafetyMode", false);
+
+    protected volatile String visitorData;
 
     public WebEmbedded() {
         super(ClientOptions.DEFAULT);
@@ -40,10 +39,13 @@ public class WebEmbedded extends Web {
     public void preparePlayback(@NotNull YoutubeAudioSourceManager source,
                                 @NotNull HttpInterface httpInterface,
                                 @NotNull String videoId) throws java.io.IOException {
-        requestVisitorData = source.getVisitorData();
-        RemotePoToken.Result result = source.generatePoToken(httpInterface, videoId);
-        if (result != null) {
-            requestPoToken = result.getPoToken();
+        visitorData = source.getVisitorData();
+        RemotePoToken.Result result = visitorData == null ? null : source.generatePoToken(httpInterface, visitorData);
+        if (result == null) {
+            poToken = null;
+        } else {
+            poToken = result.getPoToken();
+            visitorData = result.getContentBinding();
         }
     }
 
@@ -51,11 +53,11 @@ public class WebEmbedded extends Web {
     @NotNull
     public ClientConfig getBaseClientConfig(@NotNull HttpInterface httpInterface) {
         ClientConfig config = BASE_CONFIG.copy();
-        if (requestVisitorData != null) {
-            config.withVisitorData(requestVisitorData);
+        if (visitorData != null) {
+            config.withVisitorData(visitorData);
         }
-        if (requestPoToken != null) {
-            config.putOnceAndJoin(config.getRoot(), "serviceIntegrityDimensions").put("poToken", requestPoToken);
+        if (poToken != null) {
+            config.putOnceAndJoin(config.getRoot(), "serviceIntegrityDimensions").put("poToken", poToken);
         }
         return config;
     }

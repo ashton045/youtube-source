@@ -14,8 +14,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.net.URI;
-import java.net.URISyntaxException;
-import org.apache.http.client.utils.URIBuilder;
 import org.jetbrains.annotations.Nullable;
 
 public class TvHtml5Simply extends StreamingNonMusicClient {
@@ -81,22 +79,7 @@ public class TvHtml5Simply extends StreamingNonMusicClient {
         return false;
     }
 
-    @Override
-    @NotNull
-    public URI transformPlaybackUri(@NotNull URI originalUri, @NotNull URI resolvedPlaybackUri,
-                                    @Nullable String poToken) {
-        if (poToken == null) {
-            return resolvedPlaybackUri;
-        }
 
-        try {
-            URIBuilder builder = new URIBuilder(resolvedPlaybackUri);
-            builder.addParameter("pot", poToken);
-            return builder.build();
-        } catch (URISyntaxException e) {
-            return resolvedPlaybackUri;
-        }
-    }
 
     @Override
     @NotNull

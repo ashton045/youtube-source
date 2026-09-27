@@ -11,11 +11,13 @@ import dev.lavalink.youtube.YoutubeAudioSourceManager;
 import dev.lavalink.youtube.clients.ClientOptions;
 import dev.lavalink.youtube.sabr.SabrClientInfo;
 import dev.lavalink.youtube.track.format.TrackFormats;
+import org.apache.http.client.utils.URIBuilder;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -152,11 +154,25 @@ public interface Client {
         return resolvedPlaybackUri;
     }
 
+    /**
+     * The overloaded method of transformPlaybackUri() provides a new param 'poToken'
+     * @param poToken gets the proof-of-origin token and appends to the url.
+     */
     @NotNull
     default URI transformPlaybackUri(@NotNull URI originalUri,
                                      @NotNull URI resolvedPlaybackUri,
                                      @Nullable String poToken) {
-        return transformPlaybackUri(originalUri, resolvedPlaybackUri);
+        if (poToken == null) {
+            return transformPlaybackUri(originalUri, resolvedPlaybackUri);
+        }
+
+        try {
+            return new URIBuilder(resolvedPlaybackUri)
+                .addParameter("pot", poToken)
+                .build();
+        } catch (URISyntaxException e) {
+            return resolvedPlaybackUri;
+        }
     }
 
     /**

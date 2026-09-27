@@ -7,11 +7,8 @@ import dev.lavalink.youtube.clients.skeleton.MusicClient;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import org.apache.http.client.utils.URIBuilder;
-
 import java.io.IOException;
 import java.net.URI;
-import java.net.URISyntaxException;
 
 public class Music extends MusicClient {
     public static ClientConfig BASE_CONFIG = new ClientConfig()
@@ -62,23 +59,6 @@ public class Music extends MusicClient {
         return true;
     }
 
-    @Override
-    @NotNull
-    public URI transformPlaybackUri(@NotNull URI originalUri,
-                                    @NotNull URI resolvedPlaybackUri,
-                                    @Nullable String token) {
-        if (token == null) {
-            return resolvedPlaybackUri;
-        }
-
-        try {
-            return new URIBuilder(resolvedPlaybackUri)
-                .addParameter("pot", token)
-                .build();
-        } catch (URISyntaxException e) {
-            return resolvedPlaybackUri;
-        }
-    }
 
     @Override
     @NotNull
