@@ -18,12 +18,12 @@ import java.net.URI;
  */
 public class RemoteMWebPlaybackTest {
     private static final String Id = "iiEt0wrFehA";
-    private static final String RemotePotBase = "http://localhost:8080";
-    private static final String CipherUrl = "https://cipher.kikkia.dev/";
+    private static final String RemotePotBase = System.getenv("REMOTE_POT");
+    private static final String CipherUrl = System.getenv("REMOTE_CIPHER");
     private static final String AGENT = "cipher/1.0";
 
     @Test
-    @Disabled("Requires a running webpo-generator instance at localhost:8080")
+    @Disabled("Requires a running webpo-generator and cipher service")
     public void testMWebPlaybackUrl() throws Throwable {
 
         Client client = new MWeb();
