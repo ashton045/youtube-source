@@ -15,7 +15,6 @@ import com.sedmelluq.discord.lavaplayer.track.playback.LocalAudioTrackExecutor;
 import dev.lavalink.youtube.*;
 import dev.lavalink.youtube.UrlTools.UrlInfo;
 import dev.lavalink.youtube.cipher.ScriptExtractionException;
-import dev.lavalink.youtube.clients.Tv;
 import dev.lavalink.youtube.clients.skeleton.Client;
 import dev.lavalink.youtube.sabr.FormatId;
 import dev.lavalink.youtube.sabr.SabrClientInfo;
@@ -33,11 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static com.sedmelluq.discord.lavaplayer.container.Formats.MIME_AUDIO_WEBM;
 import static com.sedmelluq.discord.lavaplayer.tools.DataFormatTools.decodeUrlEncodedItems;
@@ -149,25 +144,6 @@ public class YoutubeAudioTrack extends DelegatedAudioTrack {
       }
 
       if (!exceptions.isEmpty()) {
-        for (Client client : clients) {
-          if (!(client instanceof Tv) || !client.getOptions().getPlayback()) {
-            continue;
-          }
-
-          Tv legacyClient = ((Tv) client).createLegacyPlaybackClient(sourceManager.getOauth2Handler().isEnabled());
-          log.debug("All configured clients failed attempting TVHTML5 with itag18");
-          httpInterface.getContext().setAttribute(Client.OAUTH_CLIENT_ATTRIBUTE, legacyClient.supportsOAuth());
-
-          try {
-            processWithClient(localExecutor, httpInterface, legacyClient, 0);
-            return;
-          } catch (Exception e) {
-            log.debug("TVHTML5 itag 18 fallback failed", e);
-          }
-
-          break;
-        }
-
         throw new AllClientsFailedException(exceptions);
       }
     } catch (CannotBeLoaded e) {
@@ -185,12 +161,10 @@ public class YoutubeAudioTrack extends DelegatedAudioTrack {
       throw new FriendlyException("This video cannot be played", Severity.SUSPICIOUS, null);
     }
 
-    StreamFormat format = client instanceof Tv && ((Tv) client).isLegacyPlayback()
-        ? formats.getFormatByItag(18)
-        : formats.getBestFormat();
+    StreamFormat format = formats.getBestFormat();
 
     if (format == null) {
-      throw new FriendlyException("This video has no direct itag 18 format", Severity.COMMON, null);
+      throw new FriendlyException("No supported format found", Severity.SUSPICIOUS, null);
     }
 
     if (format.isSabr()) {
@@ -268,7 +242,7 @@ public class YoutubeAudioTrack extends DelegatedAudioTrack {
       return new URI(serverAbrStreamingUrl);
     }
 
-    UrlInfo urlInfo = UrlTools.getUrlInfo(serverAbrStreamingUrl, true);
+    UrlTools.UrlInfo urlInfo = UrlTools.getUrlInfo(serverAbrStreamingUrl, true);
     String nParameter = urlInfo.parameters.get("n");
 
     if (nParameter == null) {
